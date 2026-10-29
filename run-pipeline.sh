@@ -4,7 +4,9 @@
 #
 #   AUTHORIZED / OWN TARGETS ONLY. See README. This is not for systems you don't control.
 #
-#   ./run-pipeline.sh <repo_path> [live_url] [--agentgg] [--exploit <script>] [--attack] [--pyrit <ai-endpoint>] [--garak <ai-endpoint>]
+#   ./run-pipeline.sh <repo_path> [live_url] [--agentgg] [--exploit <script>] [--attack] [--pyrit <url>] [--garak <url>] [--only m,m] [--skip m,m]
+#   ./run-pipeline.sh --help        # options + module list
+#   ./run-pipeline.sh --check       # which tools are installed
 #
 # No accounts for the core phases. Optional: drop your own OPENROUTER_API_KEY in ./.env for the AI
 # phases — see .env.example.
@@ -26,25 +28,84 @@
 set -uo pipefail
 ROOT=${0:A:h}
 [ -f "$ROOT/.env" ] && source "$ROOT/.env"   # your OpenRouter key etc.
+# One key covers everything: let mcp-scanner reuse your OpenRouter key if you didn't set its own.
+: "${MCP_SCANNER_LLM_API_KEY:=${OPENROUTER_API_KEY:-}}"; export MCP_SCANNER_LLM_API_KEY
 
-REPO="${1:?usage: run-pipeline.sh <repo_path> [live_url] [--agentgg] [--exploit <script>] [--attack] [--pyrit <ai-endpoint>] [--garak <ai-endpoint>]}"
-shift
-LIVE=""; RUN_AGENTGG=0; RUN_ATTACK=0; EXPLOIT=""; PYRIT=""; GARAK=""
+have(){ command -v "$1" >/dev/null 2>&1; }
+
+usage(){ cat <<'H'
+tellystrike — one security pipeline for an app you own.
+
+  ./run-pipeline.sh <repo_path> [live_url] [options]
+
+Options:
+  --agentgg                 agentic SAST (needs agentgg + your OpenRouter key)
+  --exploit <script>        run your own PoC against the live box
+  --attack                  live attack scan (nuclei / ZAP) of the live_url
+  --pyrit  <ai-endpoint>    AI red-team: PyRIT injection seeds
+  --garak  <ai-endpoint>    AI red-team: NVIDIA garak probe library
+  --only  <m,m,...>         run ONLY these modules
+  --skip  <m,m,...>         run everything EXCEPT these modules
+  --check                   show which tools are installed, then exit
+  --help                    show this, then exit
+
+Modules:  deps  sast  mcp  skills  agentgg  exploit  attack  pyrit  garak
+          (recon + report always run)
+
+One key unlocks every AI feature: put OPENROUTER_API_KEY in ./.env (see .env.example).
+The core modules (deps, sast, mcp, skills) need no key and no account.
+H
+}
+
+doctor(){
+  print -P "%F{cyan}== tool check — which modules can run ==%f"
+  for row in \
+    "osv-scanner:deps — dependency CVEs" \
+    "semgrep:sast — code data-flow bugs" \
+    "mcp-scanner:mcp — MCP server audit" \
+    "python3:skills + pyrit — agent files / AI red-team" \
+    "agentgg:agentgg — agentic SAST" \
+    "nuclei:attack — live scan, no server" \
+    "zap-baseline.py:attack — deeper live baseline" \
+    "garak:garak — NVIDIA AI red-team"; do
+    t=${row%%:*}; d=${row#*:}
+    if have "$t"; then print -P "  %F{green}ok%f  $t — $d"
+    else print -P "  %F{yellow}--%f  $t — $d (phase skips)"; fi
+  done
+  if [ -n "${OPENROUTER_API_KEY:-}" ]; then print -P "  %F{green}ok%f  OPENROUTER_API_KEY set — AI features on"
+  else print -P "  %F{yellow}--%f  OPENROUTER_API_KEY unset — AI features off (free phases still run)"; fi
+}
+
+case "${1:-}" in
+  -h|--help|--list|"") usage; exit 0;;
+  --check|--doctor)    doctor; exit 0;;
+esac
+
+REPO="$1"; shift
+LIVE=""; RUN_AGENTGG=0; RUN_ATTACK=0; EXPLOIT=""; PYRIT=""; GARAK=""; ONLY=""; SKIP=""
 while [ $# -gt 0 ]; do case "$1" in
   --agentgg) RUN_AGENTGG=1;;
   --attack)  RUN_ATTACK=1;;
   --exploit) EXPLOIT="$2"; shift;;
   --pyrit)   PYRIT="$2"; shift;;
   --garak)   GARAK="$2"; shift;;
+  --only)    ONLY="$2"; shift;;
+  --skip)    SKIP="$2"; shift;;
   http*://*) LIVE="$1";;
   *) [ -z "$LIVE" ] && LIVE="$1";;
 esac; shift; done
+
+# module gate: --only wins; else --skip; else everything runs.
+want(){ local m="$1"
+  if [ -n "$ONLY" ]; then [[ ",$ONLY," == *",$m,"* ]]; return $?; fi
+  if [ -n "$SKIP" ]; then [[ ",$SKIP," != *",$m,"* ]]; return $?; fi
+  return 0
+}
 
 REPO=${REPO:A}; NAME=${REPO:t}
 TS=$(date +%Y%m%d-%H%M%S)
 OUT="$ROOT/runs/$NAME-$TS"; mkdir -p "$OUT"
 say(){ print -P "%F{cyan}== $* %f"; }
-have(){ command -v "$1" >/dev/null 2>&1; }
 
 say "PIPELINE: $NAME  ($REPO)  live=${LIVE:-none}  -> $OUT"
 
@@ -57,7 +118,8 @@ say "1. Recon"
 
 # ── 2. Dependencies (SCA) — OSV-Scanner, no account ─────────────────────────
 say "2. Deps (OSV-Scanner)"
-if have osv-scanner; then
+if ! want deps; then echo "skip (deselected)" | tee "$OUT/02-deps.txt"
+elif have osv-scanner; then
   # v1 syntax is `-r`; v2 is `scan -r`. Try both so either install works.
   ( osv-scanner --recursive "$REPO" || osv-scanner scan --recursive "$REPO" ) > "$OUT/02-deps.txt" 2>&1
   grep -iE "total|vulnerab|CVE|GHSA" "$OUT/02-deps.txt" | tail -5
@@ -65,7 +127,8 @@ else echo "skip (no osv-scanner — install: brew install osv-scanner — no acc
 
 # ── 3. SAST — Semgrep OSS, no account ───────────────────────────────────────
 say "3. SAST (Semgrep)"
-if have semgrep; then
+if ! want sast; then echo "skip (deselected)" | tee "$OUT/03-sast.txt"
+elif have semgrep; then
   # --config auto pulls community rules (no login). Pin p/default for fully offline runs.
   ( cd "$REPO" && semgrep scan --config auto --quiet "$REPO" ) > "$OUT/03-sast.txt" 2>&1
   grep -iE "finding|error|Blocking|rules ran" "$OUT/03-sast.txt" | tail -10
@@ -73,7 +136,8 @@ else echo "skip (no semgrep — install: pipx install semgrep — no account, no
 
 # ── 4. MCP audit ────────────────────────────────────────────────────────────
 say "4. MCP audit (mcp-scanner)"
-if have mcp-scanner && grep -q yes <(grep "MCP server: yes" "$OUT/01-recon.txt" 2>/dev/null) ; then
+if ! want mcp; then echo "skip (deselected)" | tee "$OUT/04-mcp.txt"
+elif have mcp-scanner && grep -q yes <(grep "MCP server: yes" "$OUT/01-recon.txt" 2>/dev/null) ; then
   echo "MCP server detected — extract a tools.json and run: mcp-scanner --analyzers yara static --tools tools.json" | tee "$OUT/04-mcp.txt"
   echo "(LLM + behavioral analyzers need MCP_SCANNER_LLM_API_KEY = your OpenRouter/other key)" | tee -a "$OUT/04-mcp.txt"
 else echo "skip (not an MCP server, or no mcp-scanner — install: uv tool install cisco-ai-mcp-scanner)" | tee "$OUT/04-mcp.txt"; fi
@@ -82,7 +146,8 @@ else echo "skip (not an MCP server, or no mcp-scanner — install: uv tool insta
 say "4b. Skills audit (agent instruction files)"
 SKOUT="$OUT/04b-skills.txt"
 SKDIR="$ROOT/skills"
-if [ -f "$SKDIR/scan.py" ]; then
+if ! want skills; then echo "skip (deselected)" | tee "$SKOUT"
+elif [ -f "$SKDIR/scan.py" ]; then
   # --llm adds the intent read only when a key is present; deterministic otherwise.
   if [ -n "${OPENROUTER_API_KEY:-}" ]; then
     python3 "$SKDIR/scan.py" "$REPO" --llm > "$SKOUT" 2>&1
@@ -94,7 +159,8 @@ else echo "skip (no skills/scan.py in repo)" | tee "$SKOUT"; fi
 
 # ── 5. Agentic SAST (opt-in; brings your OpenRouter key) ─────────────────────
 say "5. Agentic SAST (AgentGG)"
-if [ "$RUN_AGENTGG" = 1 ] && have agentgg; then
+if ! want agentgg; then echo "skip (deselected)" | tee "$OUT/05-agentgg.txt"
+elif [ "$RUN_AGENTGG" = 1 ] && have agentgg; then
   : "${OPENROUTER_API_KEY:?AgentGG phase needs OPENROUTER_API_KEY — set it in ./.env (see .env.example). Drive AgentGG via OpenRouter, not the Anthropic path.}"
   agentgg scan "$REPO" -o "$OUT/agentgg" > "$OUT/05-agentgg.txt" 2>&1
   tail -15 "$OUT/05-agentgg.txt"
@@ -102,7 +168,8 @@ else echo "skip (pass --agentgg; needs: npm i -g agentgg + OPENROUTER_API_KEY in
 
 # ── 6. Live exploit / validation ────────────────────────────────────────────
 say "6. Live PoC"
-if [ -n "$EXPLOIT" ] && [ -x "$EXPLOIT" ]; then
+if ! want exploit; then echo "skip (deselected)" | tee "$OUT/06-exploit.txt"
+elif [ -n "$EXPLOIT" ] && [ -x "$EXPLOIT" ]; then
   "$EXPLOIT" > "$OUT/06-exploit.txt" 2>&1
   tail -20 "$OUT/06-exploit.txt"
 else echo "skip (pass --exploit <script> to run a weaponized PoC against $LIVE)" | tee "$OUT/06-exploit.txt"; fi
@@ -110,7 +177,8 @@ else echo "skip (pass --exploit <script> to run a weaponized PoC against $LIVE)"
 # ── 6b. Live attack scan — runs whatever is installed; no server by default ──
 say "6b. Live attack scan"
 HXOUT="$OUT/06b-attack.txt"
-if [ "$RUN_ATTACK" = 1 ] && [ -n "$LIVE" ]; then
+if ! want attack; then echo "skip (deselected)" | tee "$HXOUT"
+elif [ "$RUN_ATTACK" = 1 ] && [ -n "$LIVE" ]; then
   : > "$HXOUT"; ran=0
   # nuclei: single Go binary, no server, no account. The no-install-server default.
   if have nuclei; then
@@ -145,7 +213,8 @@ fi
 say "6c. AI red-team (PyRIT)"
 PYOUT="$OUT/06c-pyrit.txt"
 PYDIR="$ROOT/pyrit"
-if [ -n "$PYRIT" ]; then
+if ! want pyrit; then echo "skip (deselected)" | tee "$PYOUT"
+elif [ -n "$PYRIT" ]; then
   if [ -x "$PYDIR/.venv/bin/python" ]; then PY="$PYDIR/.venv/bin/python"; else PY="python3"; fi
   "$PY" "$PYDIR/probe.py" "$PYRIT" --out "$PYOUT" 2>&1 | tee "$PYOUT.live"
   [ -f "$PYOUT.live" ] && { cat "$PYOUT.live" >> "$PYOUT" 2>/dev/null; rm -f "$PYOUT.live"; }
@@ -158,7 +227,8 @@ fi
 say "6d. AI red-team (garak)"
 GKOUT="$OUT/06d-garak.txt"
 GKDIR="$ROOT/garak"
-if [ -n "$GARAK" ]; then
+if ! want garak; then echo "skip (deselected)" | tee "$GKOUT"
+elif [ -n "$GARAK" ]; then
   if [ -x "$GKDIR/run.sh" ]; then
     "$GKDIR/run.sh" "$GARAK" > "$GKOUT" 2>&1
   else
@@ -178,4 +248,13 @@ say "7. Report"
     echo "## ${p#*-}"; echo '```'; tail -20 "$OUT/$p.txt" 2>/dev/null; echo '```'; echo
   done
 } > "$OUT/REPORT.md"
+
+# ── summary: what ran vs what skipped (deselected or tool/input missing) ──────
+rn=(); sk=()
+for pm in 02-deps:deps 03-sast:sast 04-mcp:mcp 04b-skills:skills 05-agentgg:agentgg \
+          06-exploit:exploit 06b-attack:attack 06c-pyrit:pyrit 06d-garak:garak; do
+  f=${pm%%:*}; m=${pm##*:}
+  if head -1 "$OUT/$f.txt" 2>/dev/null | grep -qi '^skip'; then sk+=("$m"); else rn+=("$m"); fi
+done
+say "SUMMARY  ran: ${rn[*]:-none}   |   skipped: ${sk[*]:-none}"
 print -P "%F{green}done -> $OUT/REPORT.md%f"

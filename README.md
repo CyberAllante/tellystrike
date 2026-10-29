@@ -14,13 +14,18 @@ Free. No account, no signup, clone it and go. The only key you ever need is your
 and only for the AI checks.
 
 ```bash
-cp .env.example .env            # add your OpenRouter key
-./run-pipeline.sh ./my-app                                   # code + dependency + MCP checks
+./setup.sh                      # one-time: installs the free, no-account tools
+./run-pipeline.sh --check       # shows which modules can run right now
+cp .env.example .env            # optional: paste your OpenRouter key for the AI phases
+
+./run-pipeline.sh ./my-app                                   # code + dependency + MCP + skills checks
+./run-pipeline.sh ./my-app --only deps,skills                # run just the modules you want
 ./run-pipeline.sh ./my-app http://127.0.0.1:3000 --agentgg   # + AI that confirms access-control bugs
 ./run-pipeline.sh ./my-app http://127.0.0.1:3000 --pyrit http://127.0.0.1:3000/api/ai   # + AI red-team
 ```
 
-You get one report in `runs/<name>-<timestamp>/REPORT.md`.
+You get one report in `runs/<name>-<timestamp>/REPORT.md`, and a one-line summary of what ran vs.
+skipped. `--help` lists every option and module; `--only` / `--skip` let you pick modules.
 
 ## Why this exists
 
