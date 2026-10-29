@@ -18,7 +18,7 @@
 #   4 MCP audit  — mcp-scanner           : tool poisoning / prompt injection     [free; LLM analyzer = key]
 #   5 Agentic    — agentgg scan          : confirms bugs incl. authz/IDOR        [--agentgg; OpenRouter key]
 #   6 Live PoC   — your exploit script    : prove impact on the running box       [--exploit]
-#   6b Attack    — HexStrike or ZAP       : autonomous nmap/nuclei/nikto sweep     [--attack; local service]
+#   6b Attack    — nuclei / OWASP ZAP     : live scan (nuclei needs no server)      [--attack; local]
 #   6c AI red-team — PyRIT probe          : fire injection seeds at an AI endpoint  [--pyrit <url>]
 #   7 Report     — REPORT.md             : one summary of everything above
 set -uo pipefail
@@ -90,23 +90,38 @@ if [ -n "$EXPLOIT" ] && [ -x "$EXPLOIT" ]; then
   tail -20 "$OUT/06-exploit.txt"
 else echo "skip (pass --exploit <script> to run a weaponized PoC against $LIVE)" | tee "$OUT/06-exploit.txt"; fi
 
-# ── 6b. Autonomous attack (HexStrike, local) ─────────────────────────────────
-say "6b. Autonomous attack (HexStrike)"
+# ── 6b. Live attack scan — runs whatever is installed; no server by default ──
+say "6b. Live attack scan"
 HXOUT="$OUT/06b-attack.txt"
-if [ "$RUN_ATTACK" = 1 ] && [ -n "$LIVE" ] && curl -s -o /dev/null http://127.0.0.1:8888/health; then
-  HOST=$(echo "$LIVE" | sed -E 's#https?://##; s#[:/].*##')
-  PORT=$(echo "$LIVE" | sed -E 's#.*:([0-9]+).*#\1#'); [ "$PORT" = "$LIVE" ] && PORT=80
-  hx(){ curl -s -X POST http://127.0.0.1:8888/api/command -H 'content-type: application/json' \
-          --data "$(python3 -c 'import json,sys;print(json.dumps({"command":sys.argv[1]}))' "$1")" \
-        | python3 -c 'import sys,json;print(json.load(sys.stdin).get("stdout","")[:4000])' 2>/dev/null; }
-  {
-    echo "### HexStrike attack on $LIVE  (host $HOST port $PORT)"
-    echo "## nmap service scan";   hx "nmap -sV -Pn -T4 $HOST -p $PORT"
-    echo "## nuclei high/critical"; hx "nuclei -u $LIVE -severity high,critical -silent -nc -timeout 8"
-    echo "## nikto (120s cap)";     hx "nikto -h $LIVE -maxtime 120s -ask no 2>&1 | tail -25"
-  } | tee "$HXOUT"
+if [ "$RUN_ATTACK" = 1 ] && [ -n "$LIVE" ]; then
+  : > "$HXOUT"; ran=0
+  # nuclei: single Go binary, no server, no account. The no-install-server default.
+  if have nuclei; then
+    echo "### nuclei (direct) on $LIVE" | tee -a "$HXOUT"
+    nuclei -u "$LIVE" -severity low,medium,high,critical -silent -nc -timeout 8 2>&1 | tee -a "$HXOUT"
+    ran=1
+  fi
+  # OWASP ZAP baseline: fuller passive + spider scan. Ships with the ZAP install; no account.
+  if have zap-baseline.py; then
+    echo "### OWASP ZAP baseline on $LIVE" | tee -a "$HXOUT"
+    zap-baseline.py -t "$LIVE" -I 2>&1 | tail -40 | tee -a "$HXOUT"
+    ran=1
+  fi
+  # HexStrike: optional heavy agentic sweep, only if its server is already up.
+  if curl -s -o /dev/null http://127.0.0.1:8888/health 2>/dev/null; then
+    HOST=$(echo "$LIVE" | sed -E 's#https?://##; s#[:/].*##')
+    PORT=$(echo "$LIVE" | sed -E 's#.*:([0-9]+).*#\1#'); [ "$PORT" = "$LIVE" ] && PORT=80
+    hx(){ curl -s -X POST http://127.0.0.1:8888/api/command -H 'content-type: application/json' \
+            --data "$(python3 -c 'import json,sys;print(json.dumps({"command":sys.argv[1]}))' "$1")" \
+          | python3 -c 'import sys,json;print(json.load(sys.stdin).get("stdout","")[:4000])' 2>/dev/null; }
+    { echo "### HexStrike nmap + nikto on $HOST"
+      hx "nmap -sV -Pn -T4 $HOST -p $PORT"
+      hx "nikto -h $LIVE -maxtime 120s -ask no 2>&1 | tail -25"; } | tee -a "$HXOUT"
+    ran=1
+  fi
+  [ "$ran" = 0 ] && echo "skip (no attack tool found — install nuclei for the no-server default: brew install nuclei; or OWASP ZAP for a deeper baseline — see INSTALL.md)" | tee "$HXOUT"
 else
-  echo "skip (pass --attack + a live URL; needs a local HexStrike :8888, or swap in OWASP ZAP headless — see INSTALL.md)" | tee "$HXOUT"
+  echo "skip (pass --attack + a live URL you are authorized to test)" | tee "$HXOUT"
 fi
 
 # ── 6c. AI red-team (PyRIT) ──────────────────────────────────────────────────

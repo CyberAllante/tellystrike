@@ -22,17 +22,24 @@ pipx install semgrep                # or: brew install semgrep
 uv tool install --python 3.13 cisco-ai-mcp-scanner
 ```
 
-**OWASP ZAP** — the headless, free, no-license-restriction alternative to Burp Suite for the attack
-phase. Runs as an API/daemon you can script; redistributable, hostable.
+**nuclei** — the attack-phase default, phase 6b. Single Go binary, no server, no account. Runs a
+templated vuln scan straight at the live URL.
 ```bash
-# macOS
-brew install --cask zap
-# then run headless:  zap.sh -daemon -port 8090 -config api.disablekey=true
+brew install nuclei          # or: go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 ```
-Or **HexStrike** (what phase 6b posts to by default) if you prefer its :8888 command API.
+
+**OWASP ZAP** (optional, deeper) — the headless, free, no-license-restriction alternative to Burp for
+a fuller passive + spider baseline. The pipeline calls `zap-baseline.py` if it is on PATH (it ships
+with the ZAP install / the zaproxy docker image).
+```bash
+brew install --cask zap      # zap-baseline.py comes with it
+```
+
+Phase 6b runs whatever of these is installed (nuclei first, then ZAP, then a local HexStrike :8888 if
+one happens to be up), so the no-server default is just nuclei.
 
 > We deliberately do **not** use Burp Suite here: its license forbids hosting/reselling it as a
-> service, and it needs a GUI. ZAP + nuclei cover the same ground headless.
+> service, and it needs a GUI. nuclei + ZAP cover the same ground headless, no account.
 
 ## AI phases (BYOK — OpenRouter)
 

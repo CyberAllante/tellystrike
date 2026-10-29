@@ -43,7 +43,7 @@ beat your system prompt).
 | 4 | MCP audit | mcp-scanner | tool poisoning / prompt injection (MCP servers) | LLM analyzer = key |
 | 5 | Agentic SAST | AgentGG | confirms bugs incl. **authz / IDOR** that SAST misses | **OpenRouter** |
 | 6 | Live PoC | your exploit script | proves real impact on the running box | — |
-| 6b | Attack | HexStrike / OWASP ZAP | autonomous nmap/nuclei/nikto sweep of the live box | — (local) |
+| 6b | Attack | nuclei / OWASP ZAP | live scan of the running box (nuclei needs no server) | **no account** |
 | 6c | AI red-team | PyRIT | injection seeds at an AI endpoint, scored over N runs | optional (smart layer) |
 | 7 | Report | built-in | one REPORT.md of everything | — |
 
