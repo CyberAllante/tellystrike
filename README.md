@@ -1,6 +1,4 @@
-# agentic-pentest
-
-> Working name — rename before publishing.
+# tellystrike
 
 One command runs a chain of best-in-class security tools against a codebase and its running
 instance, then writes a single report. Static analysis, dependency CVEs, MCP tool audit, agentic

@@ -1,9 +1,9 @@
 ---
-name: agentic-pentest
+name: tellystrike
 description: Run an end-to-end security pass on an app the user owns. Dependency CVEs, SAST, MCP audit, a live attack scan, and an AI red-team of the app's AI endpoint, with no accounts for the core phases. Use when the user asks to scan, pentest, security-check, harden, or audit their own app, repo, or live site.
 ---
 
-# agentic-pentest
+# tellystrike
 
 End-to-end security pass for an app the user owns or is authorized to test. One pipeline runs every
 layer and writes one report. No signups for the core phases; the optional AI phases use the user's
