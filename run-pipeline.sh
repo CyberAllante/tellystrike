@@ -16,6 +16,7 @@
 #   2 Deps (SCA) — osv-scanner          : known CVEs in dependencies            [free; NO account]
 #   3 SAST       — semgrep              : data-flow bugs (SSRF, injection)      [free; NO account]
 #   4 MCP audit  — mcp-scanner           : tool poisoning / prompt injection     [free; LLM analyzer = key]
+#   4b Skills     — skills/scan.py        : poisoned SKILL.md / agent files        [free; NO account]
 #   5 Agentic    — agentgg scan          : confirms bugs incl. authz/IDOR        [--agentgg; OpenRouter key]
 #   6 Live PoC   — your exploit script    : prove impact on the running box       [--exploit]
 #   6b Attack    — nuclei / OWASP ZAP     : live scan (nuclei needs no server)      [--attack; local]
@@ -74,6 +75,20 @@ if have mcp-scanner && grep -q yes <(grep "MCP server: yes" "$OUT/01-recon.txt" 
   echo "MCP server detected — extract a tools.json and run: mcp-scanner --analyzers yara static --tools tools.json" | tee "$OUT/04-mcp.txt"
   echo "(LLM + behavioral analyzers need MCP_SCANNER_LLM_API_KEY = your OpenRouter/other key)" | tee -a "$OUT/04-mcp.txt"
 else echo "skip (not an MCP server, or no mcp-scanner — install: uv tool install cisco-ai-mcp-scanner)" | tee "$OUT/04-mcp.txt"; fi
+
+# ── 4b. Skills / agent-file audit — poisoned instruction files, no account ───
+say "4b. Skills audit (agent instruction files)"
+SKOUT="$OUT/04b-skills.txt"
+SKDIR="$ROOT/skills"
+if [ -f "$SKDIR/scan.py" ]; then
+  # --llm adds the intent read only when a key is present; deterministic otherwise.
+  if [ -n "${OPENROUTER_API_KEY:-}" ]; then
+    python3 "$SKDIR/scan.py" "$REPO" --llm > "$SKOUT" 2>&1
+  else
+    python3 "$SKDIR/scan.py" "$REPO" > "$SKOUT" 2>&1
+  fi
+  grep -iE "FINDING|clean|files scanned|high|medium" "$SKOUT" | tail -12
+else echo "skip (no skills/scan.py in repo)" | tee "$SKOUT"; fi
 
 # ── 5. Agentic SAST (opt-in; brings your OpenRouter key) ─────────────────────
 say "5. Agentic SAST (AgentGG)"
@@ -142,7 +157,7 @@ say "7. Report"
 {
   echo "# Pipeline report — $NAME — $TS"
   echo; echo "Target: $REPO  |  live: ${LIVE:-none}"; echo
-  for p in 01-recon 02-deps 03-sast 04-mcp 05-agentgg 06-exploit 06b-attack 06c-pyrit; do
+  for p in 01-recon 02-deps 03-sast 04-mcp 04b-skills 05-agentgg 06-exploit 06b-attack 06c-pyrit; do
     echo "## ${p#*-}"; echo '```'; tail -20 "$OUT/$p.txt" 2>/dev/null; echo '```'; echo
   done
 } > "$OUT/REPORT.md"

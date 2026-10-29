@@ -6,8 +6,9 @@
   <b>Point it at an app you own. It runs every security check the pros run, then hands you one plain report.</b>
 </p>
 
-Your code. Your dependencies. Your MCP tools. Your live site. Even your app's AI, which it tries to
-trick into ignoring its own instructions so you find out before someone else does.
+Your code. Your dependencies. Your MCP tools. Your agent skill files. Your live site. Even your
+app's AI, which it tries to trick into ignoring its own instructions so you find out before
+someone else does.
 
 Free. No account, no signup, clone it and go. The only key you ever need is your own OpenRouter key,
 and only for the AI checks.
@@ -42,6 +43,7 @@ beat your system prompt).
 | 2 | Deps (SCA) | OSV-Scanner | known CVEs in dependencies | **no account** |
 | 3 | SAST | Semgrep (OSS) | data-flow bugs: SSRF, injection | **no account** |
 | 4 | MCP audit | mcp-scanner | tool poisoning / prompt injection (MCP servers) | LLM analyzer = key |
+| 4b | Skills audit | built-in | poisoned `SKILL.md` / agent files: hidden instructions, exfil | **no account** |
 | 5 | Agentic SAST | AgentGG | confirms bugs incl. **authz / IDOR** that SAST misses | **OpenRouter** |
 | 6 | Live PoC | your exploit script | proves real impact on the running box | — |
 | 6b | Attack | nuclei / OWASP ZAP | live scan of the running box (nuclei needs no server) | **no account** |

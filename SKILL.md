@@ -24,8 +24,8 @@ The orchestrator is `run-pipeline.sh` in this repo:
 
 Pick the flags from what the user wants and what they have installed:
 
-- **Always free, no account:** recon + OSV-Scanner (dep CVEs) + Semgrep (SAST) + MCP audit. Just pass
-  the repo path.
+- **Always free, no account:** recon + OSV-Scanner (dep CVEs) + Semgrep (SAST) + MCP audit + skills
+  audit (scans `SKILL.md` / agent instruction files for poisoning). Just pass the repo path.
 - **`--attack` + a live URL:** a live scan with nuclei (no server needed), plus OWASP ZAP or a local
   HexStrike if either is present. Authorized targets only.
 - **`--pyrit <ai-endpoint>`:** fire prompt-injection seeds at the app's AI route N times and score
@@ -42,8 +42,10 @@ finding in each, which phases ran vs skipped, and the full report path.
 
 Treat every automated finding as a lead, not a confirmed bug. The whole point of the pipeline is that
 the layers catch what the others miss: pattern SAST is blind to authorization, so the agentic pass
-(phase 5) and the live exploit (phase 6) are what catch the cross-tenant IDOR class, and the AI
-red-team (phase 6c) is the only layer that tests whether the app's AI obeys a planted instruction.
+(phase 5) and the live exploit (phase 6) are what catch the cross-tenant IDOR class, the skills
+audit (phase 4b) is the only layer that reads the repo's own agent instruction files for planted
+hijacks, and the AI red-team (phase 6c) is the only layer that tests whether the app's live AI
+obeys a planted instruction.
 Confirm anything serious with a hand repro before calling it real.
 
 ## Setup the user may need (all no-account except the last)

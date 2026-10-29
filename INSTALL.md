@@ -22,6 +22,11 @@ pipx install semgrep                # or: brew install semgrep
 uv tool install --python 3.13 cisco-ai-mcp-scanner
 ```
 
+**Skills audit** — phase 4b. Built in: `skills/scan.py` ships with this repo and needs only
+`python3` (no install, no account). It reads the target repo's agent instruction files
+(`SKILL.md`, `.claude/agents/*`, `CLAUDE.md`, tool descriptions) for poisoning. The optional
+intent read turns on by itself when `OPENROUTER_API_KEY` is in `.env`.
+
 **nuclei** — the attack-phase default, phase 6b. Single Go binary, no server, no account. Runs a
 templated vuln scan straight at the live URL.
 ```bash
