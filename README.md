@@ -7,8 +7,9 @@ instance, then writes a single report. Static analysis, dependency CVEs, MCP too
 SAST, a live autonomous attack sweep, and an **AI red-team** phase that fires prompt-injection
 payloads at the app's AI endpoint and scores whether the model obeyed.
 
-**Bring your own key.** The deterministic phases run free. The AI phases use *your* OpenRouter key —
-nothing routes through anyone else's account.
+**No signups.** Every core phase runs with no account and no login — clone it and go. The optional
+AI phases use *your own* OpenRouter key; nothing routes through anyone else's account, and you are
+never forced to create one to use the tool.
 
 ```bash
 cp .env.example .env            # add OPENROUTER_API_KEY
@@ -37,8 +38,8 @@ beat your system prompt).
 | # | Phase | Tool | Finds | Key? |
 |---|-------|------|-------|------|
 | 1 | Recon | built-in | langs, deps, is-it-an-MCP-server, live target | — |
-| 2 | Deps (SCA) | Snyk | known CVEs in dependencies | free account |
-| 3 | SAST | Snyk Code | data-flow bugs: SSRF, injection | free account |
+| 2 | Deps (SCA) | OSV-Scanner | known CVEs in dependencies | **no account** |
+| 3 | SAST | Semgrep (OSS) | data-flow bugs: SSRF, injection | **no account** |
 | 4 | MCP audit | mcp-scanner | tool poisoning / prompt injection (MCP servers) | LLM analyzer = key |
 | 5 | Agentic SAST | AgentGG | confirms bugs incl. **authz / IDOR** that SAST misses | **OpenRouter** |
 | 6 | Live PoC | your exploit script | proves real impact on the running box | — |
@@ -51,13 +52,13 @@ PyRIT driver** — it calls tools you install yourself, so each keeps its own li
 
 ## The key model (BYOK)
 
-One `OPENROUTER_API_KEY` in `.env` unlocks every AI phase:
+The core phases need **no account and no key**: OSV-Scanner (deps) and Semgrep (SAST) are
+account-free by design, and so are the ZAP/nuclei attack and the PyRIT marker test.
+
+The only keys are optional and yours — one `OPENROUTER_API_KEY` in `.env` unlocks the AI phases:
 - **AgentGG** — drive it via OpenRouter (not the Anthropic path).
 - **PyRIT** — the marker-leak scoring is keyless; a key only powers PyRIT's LLM converters/scorers.
 - **mcp-scanner** — yara/static analyzers are keyless; the LLM analyzer uses the key.
-
-Everything else (deps, SAST via your Snyk account, the ZAP/nuclei attack, the PyRIT marker test) runs
-with no AI key at all.
 
 ## Rules of the road
 

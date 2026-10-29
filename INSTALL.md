@@ -3,11 +3,18 @@
 This repo is the orchestrator. Each phase calls a tool you install yourself — install only the ones
 whose phases you want. All are free/open-source; each keeps its own license.
 
-## Deterministic phases (no AI key)
+## Deterministic phases (no account, no key)
 
-**Snyk** — deps (SCA) + code (SAST), phases 2 & 3
+**OSV-Scanner** (Google) — dependency CVEs, phase 2. Queries osv.dev. No login, no key.
 ```bash
-npm i -g snyk && snyk auth          # free account; enable "Snyk Code" in your org for SAST
+brew install osv-scanner
+# or:  go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+```
+
+**Semgrep** (OSS) — SAST / code data-flow bugs, phase 3. Community rules, no account.
+```bash
+pipx install semgrep                # or: brew install semgrep
+# the pipeline runs: semgrep scan --config auto   (no login; pin --config p/default for offline)
 ```
 
 **mcp-scanner** (Cisco AI Defense) — phase 4, only if the target is an MCP server
@@ -46,6 +53,7 @@ converters/scorers.
 ## Quick check
 
 ```bash
-for t in snyk mcp-scanner agentgg python3; do command -v $t >/dev/null && echo "ok  $t" || echo "--  $t (phase will skip)"; done
+for t in osv-scanner semgrep mcp-scanner agentgg python3; do command -v $t >/dev/null && echo "ok  $t" || echo "--  $t (phase will skip)"; done
 ```
-Every phase skips cleanly if its tool is missing — install incrementally.
+Every phase skips cleanly if its tool is missing — install incrementally. The two core scanners
+(osv-scanner, semgrep) need no account; only the optional AI phases use your OpenRouter key.

@@ -6,14 +6,15 @@
 #
 #   ./run-pipeline.sh <repo_path> [live_url] [--agentgg] [--exploit <script>] [--attack] [--pyrit <ai-endpoint>]
 #
-# Bring-your-own-key: drop OPENROUTER_API_KEY (and optional SNYK token) in ./.env — see .env.example.
+# No accounts for the core phases. Optional: drop your own OPENROUTER_API_KEY in ./.env for the AI
+# phases — see .env.example.
 # The deterministic phases run without any key; the AI phases (AgentGG, PyRIT smart layer,
 # mcp-scanner LLM analyzer) use your key.
 #
 # Phases (each skips cleanly if its tool/input is missing):
 #   1 Recon      — what is this? (langs, deps, MCP server?, live target?)
-#   2 Deps (SCA) — snyk test            : known CVEs in dependencies            [free; snyk account]
-#   3 SAST       — snyk code test        : data-flow bugs (SSRF, injection)      [free; snyk account]
+#   2 Deps (SCA) — osv-scanner          : known CVEs in dependencies            [free; NO account]
+#   3 SAST       — semgrep              : data-flow bugs (SSRF, injection)      [free; NO account]
 #   4 MCP audit  — mcp-scanner           : tool poisoning / prompt injection     [free; LLM analyzer = key]
 #   5 Agentic    — agentgg scan          : confirms bugs incl. authz/IDOR        [--agentgg; OpenRouter key]
 #   6 Live PoC   — your exploit script    : prove impact on the running box       [--exploit]
@@ -51,19 +52,21 @@ say "1. Recon"
   echo "looks like an MCP server: $([ -n "$(grep -rl "tools/list\|registerTool\|@modelcontextprotocol" "$REPO" --include=*.ts --include=*.js --include=*.py --include=*.php 2>/dev/null | head -1)" ] && echo yes || echo no)"
 } | tee "$OUT/01-recon.txt"
 
-# ── 2. Dependencies (SCA) ───────────────────────────────────────────────────
-say "2. Deps (Snyk SCA)"
-if have snyk && ls "$REPO"/package*.json "$REPO"/composer.lock "$REPO"/requirements.txt >/dev/null 2>&1; then
-  ( cd "$REPO" && snyk test --severity-threshold=high ) > "$OUT/02-deps.txt" 2>&1
-  grep -E "Total|issues|CRITICAL|HIGH" "$OUT/02-deps.txt" | tail -3
-else echo "skip (no snyk or no manifest — install: npm i -g snyk && snyk auth)" | tee "$OUT/02-deps.txt"; fi
+# ── 2. Dependencies (SCA) — OSV-Scanner, no account ─────────────────────────
+say "2. Deps (OSV-Scanner)"
+if have osv-scanner; then
+  # v1 syntax is `-r`; v2 is `scan -r`. Try both so either install works.
+  ( osv-scanner --recursive "$REPO" || osv-scanner scan --recursive "$REPO" ) > "$OUT/02-deps.txt" 2>&1
+  grep -iE "total|vulnerab|CVE|GHSA" "$OUT/02-deps.txt" | tail -5
+else echo "skip (no osv-scanner — install: brew install osv-scanner — no account, no key)" | tee "$OUT/02-deps.txt"; fi
 
-# ── 3. SAST ─────────────────────────────────────────────────────────────────
-say "3. SAST (Snyk Code)"
-if have snyk; then
-  ( cd "$REPO" && snyk code test --severity-threshold=high ) > "$OUT/03-sast.txt" 2>&1
-  grep -E "✗|Total issues|HIGH" "$OUT/03-sast.txt" | head -20
-else echo "skip (no snyk — enable Snyk Code in your org settings for SAST)" | tee "$OUT/03-sast.txt"; fi
+# ── 3. SAST — Semgrep OSS, no account ───────────────────────────────────────
+say "3. SAST (Semgrep)"
+if have semgrep; then
+  # --config auto pulls community rules (no login). Pin p/default for fully offline runs.
+  ( cd "$REPO" && semgrep scan --config auto --quiet "$REPO" ) > "$OUT/03-sast.txt" 2>&1
+  grep -iE "finding|error|Blocking|rules ran" "$OUT/03-sast.txt" | tail -10
+else echo "skip (no semgrep — install: pipx install semgrep — no account, no key)" | tee "$OUT/03-sast.txt"; fi
 
 # ── 4. MCP audit ────────────────────────────────────────────────────────────
 say "4. MCP audit (mcp-scanner)"
