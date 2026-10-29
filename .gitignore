@@ -4,3 +4,5 @@ pyrit/.venv/
 __pycache__/
 *.pyc
 .DS_Store
+garak/rest-config.json
+garak/rest-config.generated.json

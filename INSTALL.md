@@ -62,6 +62,14 @@ npm i -g agentgg
 The PyRIT marker test runs even without this (builtin fallback engine); setup.sh adds PyRIT's
 converters/scorers.
 
+**garak** (NVIDIA) — AI red-team, phase 6d (`--garak <endpoint>`). The heavy probe library.
+```bash
+pipx install garak      # or: pip install garak
+```
+Targets your app's AI route via garak's REST generator; it assumes an OpenAI-shaped API and tells
+you which two fields to edit if yours differs. See `garak/README.md` for that and for scanning a
+model straight through OpenRouter. The phase skips clean if garak isn't installed.
+
 ## Quick check
 
 ```bash

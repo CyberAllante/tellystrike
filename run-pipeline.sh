@@ -4,7 +4,7 @@
 #
 #   AUTHORIZED / OWN TARGETS ONLY. See README. This is not for systems you don't control.
 #
-#   ./run-pipeline.sh <repo_path> [live_url] [--agentgg] [--exploit <script>] [--attack] [--pyrit <ai-endpoint>]
+#   ./run-pipeline.sh <repo_path> [live_url] [--agentgg] [--exploit <script>] [--attack] [--pyrit <ai-endpoint>] [--garak <ai-endpoint>]
 #
 # No accounts for the core phases. Optional: drop your own OPENROUTER_API_KEY in ./.env for the AI
 # phases — see .env.example.
@@ -21,19 +21,21 @@
 #   6 Live PoC   — your exploit script    : prove impact on the running box       [--exploit]
 #   6b Attack    — nuclei / OWASP ZAP     : live scan (nuclei needs no server)      [--attack; local]
 #   6c AI red-team — PyRIT probe          : fire injection seeds at an AI endpoint  [--pyrit <url>]
+#   6d AI red-team — garak (NVIDIA)        : big probe library at an AI endpoint     [--garak <url>]
 #   7 Report     — REPORT.md             : one summary of everything above
 set -uo pipefail
 ROOT=${0:A:h}
 [ -f "$ROOT/.env" ] && source "$ROOT/.env"   # your OpenRouter key etc.
 
-REPO="${1:?usage: run-pipeline.sh <repo_path> [live_url] [--agentgg] [--exploit <script>] [--attack] [--pyrit <ai-endpoint>]}"
+REPO="${1:?usage: run-pipeline.sh <repo_path> [live_url] [--agentgg] [--exploit <script>] [--attack] [--pyrit <ai-endpoint>] [--garak <ai-endpoint>]}"
 shift
-LIVE=""; RUN_AGENTGG=0; RUN_ATTACK=0; EXPLOIT=""; PYRIT=""
+LIVE=""; RUN_AGENTGG=0; RUN_ATTACK=0; EXPLOIT=""; PYRIT=""; GARAK=""
 while [ $# -gt 0 ]; do case "$1" in
   --agentgg) RUN_AGENTGG=1;;
   --attack)  RUN_ATTACK=1;;
   --exploit) EXPLOIT="$2"; shift;;
   --pyrit)   PYRIT="$2"; shift;;
+  --garak)   GARAK="$2"; shift;;
   http*://*) LIVE="$1";;
   *) [ -z "$LIVE" ] && LIVE="$1";;
 esac; shift; done
@@ -152,12 +154,27 @@ else
   echo "skip (pass --pyrit <ai-endpoint-url>; run pyrit/setup.sh once for the full PyRIT engine)" | tee "$PYOUT"
 fi
 
+# ── 6d. AI red-team (garak / NVIDIA) ─────────────────────────────────────────
+say "6d. AI red-team (garak)"
+GKOUT="$OUT/06d-garak.txt"
+GKDIR="$ROOT/garak"
+if [ -n "$GARAK" ]; then
+  if [ -x "$GKDIR/run.sh" ]; then
+    "$GKDIR/run.sh" "$GARAK" > "$GKOUT" 2>&1
+  else
+    zsh "$GKDIR/run.sh" "$GARAK" > "$GKOUT" 2>&1
+  fi
+  grep -iE "garak|probe|fail|pass|skip|report" "$GKOUT" | tail -15
+else
+  echo "skip (pass --garak <ai-endpoint-url>; install: pipx install garak — see garak/README.md)" | tee "$GKOUT"
+fi
+
 # ── 7. Report ───────────────────────────────────────────────────────────────
 say "7. Report"
 {
   echo "# Pipeline report — $NAME — $TS"
   echo; echo "Target: $REPO  |  live: ${LIVE:-none}"; echo
-  for p in 01-recon 02-deps 03-sast 04-mcp 04b-skills 05-agentgg 06-exploit 06b-attack 06c-pyrit; do
+  for p in 01-recon 02-deps 03-sast 04-mcp 04b-skills 05-agentgg 06-exploit 06b-attack 06c-pyrit 06d-garak; do
     echo "## ${p#*-}"; echo '```'; tail -20 "$OUT/$p.txt" 2>/dev/null; echo '```'; echo
   done
 } > "$OUT/REPORT.md"

@@ -30,6 +30,9 @@ Pick the flags from what the user wants and what they have installed:
   HexStrike if either is present. Authorized targets only.
 - **`--pyrit <ai-endpoint>`:** fire prompt-injection seeds at the app's AI route N times and score
   whether the model obeyed a planted instruction. Point it at the AI route, not the app root.
+- **`--garak <ai-endpoint>`:** NVIDIA garak's large probe library (jailbreaks, indirect injection,
+  encoding, leakage) against the same AI route. Heavier than PyRIT; run both for fuller coverage.
+  Needs garak installed (`pipx install garak`); skips clean otherwise.
 - **`--agentgg`:** agentic SAST that confirms authz/IDOR bugs the pattern scanners miss. Needs the
   user's `OPENROUTER_API_KEY` in `.env`.
 

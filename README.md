@@ -30,10 +30,12 @@ scanners missed.** Pattern-matching SAST is blind to authorization; only the age
 live exploit caught it. That gap is the whole point: this pipeline chains the layers so the bug class
 each tool misses gets caught by the next one.
 
-The newest phase, **AI red-team (PyRIT)**, is the layer none of the code/network scanners can do:
-it tests whether your app's *AI* obeys a planted instruction. It fires injection seeds at your AI
-endpoint N times each and scores whether a harmless marker leaked into the reply (= the injection
-beat your system prompt).
+The **AI red-team** phases are the layer none of the code/network scanners can do: they test
+whether your app's *AI* obeys a planted instruction. **PyRIT** (6c) fires injection seeds at your
+AI endpoint N times each and scores whether a harmless marker leaked into the reply (= the
+injection beat your system prompt). **garak** (6d, NVIDIA) hits the same endpoint with a much
+larger probe library — jailbreaks, indirect injection, encoding attacks, data leakage — so run
+both to cover more ground. Point them at your AI route, not the app root.
 
 ## The phases
 
@@ -48,6 +50,7 @@ beat your system prompt).
 | 6 | Live PoC | your exploit script | proves real impact on the running box | — |
 | 6b | Attack | nuclei / OWASP ZAP | live scan of the running box (nuclei needs no server) | **no account** |
 | 6c | AI red-team | PyRIT | injection seeds at an AI endpoint, scored over N runs | optional (smart layer) |
+| 6d | AI red-team | garak (NVIDIA) | big probe library (jailbreak, injection, leakage) at an AI endpoint | optional |
 | 7 | Report | built-in | one REPORT.md of everything | — |
 
 Install the third-party tools per [INSTALL.md](INSTALL.md). This repo is the **orchestrator + the
