@@ -1,22 +1,25 @@
-# tellystrike
+<p align="center">
+  <img src="logo.svg" alt="TELLYSTRIKE" width="840">
+</p>
 
-One command runs a chain of best-in-class security tools against a codebase and its running
-instance, then writes a single report. Static analysis, dependency CVEs, MCP tool audit, agentic
-SAST, a live autonomous attack sweep, and an **AI red-team** phase that fires prompt-injection
-payloads at the app's AI endpoint and scores whether the model obeyed.
+<p align="center">
+  <b>Point it at an app you own. It runs every security check the pros run, then hands you one plain report.</b>
+</p>
 
-**No signups.** Every core phase runs with no account and no login — clone it and go. The optional
-AI phases use *your own* OpenRouter key; nothing routes through anyone else's account, and you are
-never forced to create one to use the tool.
+Your code. Your dependencies. Your MCP tools. Your live site. Even your app's AI, which it tries to
+trick into ignoring its own instructions so you find out before someone else does.
+
+Free. No account, no signup, clone it and go. The only key you ever need is your own OpenRouter key,
+and only for the AI checks.
 
 ```bash
-cp .env.example .env            # add OPENROUTER_API_KEY
-./run-pipeline.sh ./my-app                                   # fast: recon + deps + SAST + MCP check
-./run-pipeline.sh ./my-app http://127.0.0.1:3000 --agentgg   # + agentic SAST (authz/IDOR)
+cp .env.example .env            # add your OpenRouter key
+./run-pipeline.sh ./my-app                                   # code + dependency + MCP checks
+./run-pipeline.sh ./my-app http://127.0.0.1:3000 --agentgg   # + AI that confirms access-control bugs
 ./run-pipeline.sh ./my-app http://127.0.0.1:3000 --pyrit http://127.0.0.1:3000/api/ai   # + AI red-team
 ```
 
-Report lands in `runs/<name>-<timestamp>/REPORT.md`.
+You get one report in `runs/<name>-<timestamp>/REPORT.md`.
 
 ## Why this exists
 
