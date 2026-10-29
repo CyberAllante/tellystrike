@@ -23,7 +23,7 @@
 #   7 Report     — REPORT.md             : one summary of everything above
 set -uo pipefail
 ROOT=${0:A:h}
-[ -f "$ROOT/.env" ] && source "$ROOT/.env"   # BYOK: OPENROUTER_API_KEY etc.
+[ -f "$ROOT/.env" ] && source "$ROOT/.env"   # your OpenRouter key etc.
 
 REPO="${1:?usage: run-pipeline.sh <repo_path> [live_url] [--agentgg] [--exploit <script>] [--attack] [--pyrit <ai-endpoint>]}"
 shift

@@ -41,7 +41,7 @@ one happens to be up), so the no-server default is just nuclei.
 > We deliberately do **not** use Burp Suite here: its license forbids hosting/reselling it as a
 > service, and it needs a GUI. nuclei + ZAP cover the same ground headless, no account.
 
-## AI phases (BYOK — OpenRouter)
+## AI phases (your OpenRouter key)
 
 **AgentGG** — agentic SAST, phase 5 (`--agentgg`)
 ```bash

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.svg" alt="TELLYSTRIKE" width="840">
+  <img src="logo.png" alt="TELLYSTRIKE" width="340">
 </p>
 
 <p align="center">
@@ -51,7 +51,7 @@ beat your system prompt).
 Install the third-party tools per [INSTALL.md](INSTALL.md). This repo is the **orchestrator + the
 PyRIT driver** — it calls tools you install yourself, so each keeps its own license.
 
-## The key model (BYOK)
+## The only key you need
 
 The core phases need **no account and no key**: OSV-Scanner (deps) and Semgrep (SAST) are
 account-free by design, and so are the ZAP/nuclei attack and the PyRIT marker test.
